@@ -58,7 +58,7 @@ module OpenShift
         filter("state", "available").
         filter("name", filter)
     end
-          
+
     def delete_detached_volumes(conn)
       volumes = conn.volumes.filter("status", "available")
       volumes.each do |volume|
@@ -68,7 +68,7 @@ module OpenShift
         end
       end
     end
-          
+
     def delete_unused_snapshots(conn)
       snapshots = conn.snapshots.with_owner(:self).filter("status", "completed")
       snapshots.each do |snapshot|
@@ -82,13 +82,13 @@ module OpenShift
         end
       end
     end
-    
+
     def get_specific_public_ami(conn, filter_val)
       if filter_val.start_with?("ami")
         filter_param = "image-id"
       else
         filter_param = "name"
-      end 
+      end
       AWS.memoize do
         devenv_amis = conn.images.
           filter("state", "available").
@@ -97,13 +97,13 @@ module OpenShift
         devenv_amis.to_a[0]
       end
     end
-    
+
     def get_specific_ami(conn, filter_val)
       if filter_val.start_with?("ami")
         filter_param = "image-id"
       else
         filter_param = "name"
-      end 
+      end
       AWS.memoize do
         devenv_amis = conn.images.with_owner(:self).
           filter("state", "available").
@@ -147,13 +147,16 @@ module OpenShift
       else
         instances = conn.instances.filter('dns-name', name)
       end
+      allowed_instances = []
       instances.each do |i|
         if (instance_status(i) != :terminated)
           puts "Found instance #{i.id} (#{i.tags["Name"]})" unless silent
           block_until_available(i, ssh_user) if block_until_available
-          return i
+          allowed_instances << i
         end
       end
+
+      return allowed_instances unless allowed_instances.empty?
 
       puts "No instance found matching #{name}"
 
@@ -173,7 +176,7 @@ module OpenShift
 
       return nil
     end
-      
+
     def terminate_instance(instance, handle_unauthorized=false)
       if !instance.api_termination_disabled?
         begin
@@ -205,7 +208,7 @@ module OpenShift
         puts "Termination protection is enabled for: #{instance.id} (#{instance.tags["Name"]})"
       end
     end
-        
+
     def add_tag(instance, name, retries=2)
       (1..retries).each do |i|
         begin
@@ -305,7 +308,7 @@ module OpenShift
       end
       private_ip
     end
-    
+
     def use_private_ip(hostname, ssh_user="root")
       private_ip = get_private_ip(hostname)
       puts "Updating instance facts with private ip #{private_ip}"
@@ -329,7 +332,7 @@ module OpenShift
       ssh(hostname, "sed -i \"s/.*PUBLIC_IP_OVERRIDE.*/#PUBLIC_IP_OVERRIDE=/g\" /etc/openshift/node.conf; sed -i \"s/.*PUBLIC_HOSTNAME_OVERRIDE.*/#PUBLIC_HOSTNAME_OVERRIDE=/g\" /etc/openshift/node.conf; #{SCL_ROOT}/usr/libexec/mcollective/update_yaml.rb /etc/mcollective/facts.yaml; service libra-data start", 60, false, 1, ssh_user)
       puts 'Done'
     end
-    
+
     def set_instance_ip(hostname, ip, dhostname, ssh_user="root")
       print "Updating the controller to use the ip '#{ip}'..."
       # Both calls below are needed to fix a race condition between ssh and libra-data start times
@@ -342,13 +345,13 @@ module OpenShift
       image.add_tag('Name', :value => VERIFIED_TAG)
       log.info "Done"
     end
-    
+
     def register_image(conn, instance, name, manifest)
       puts "Registering AMI..."
       outer_num_retries = 4
       image = nil
       (1..outer_num_retries).each do |outer_index|
-        image = conn.images.create(:instance_id => instance.id, 
+        image = conn.images.create(:instance_id => instance.id,
           :name => name,
           :description => manifest)
         num_retries = 10
@@ -389,7 +392,7 @@ module OpenShift
         end
       end
     end
-    
+
     def terminate_old_verifiers(conn)
       AWS.memoize do
         build_name_to_verifiers = {}
@@ -472,7 +475,7 @@ module OpenShift
         end
       end
     end
-    
+
     def tag_to_terminate(i)
       if !i.tags["Name"] || !i.tags["Name"].end_with?('-terminate')
         log.info "Tagging instance to terminate #{i.id} (#{i.tags["Name"]})"
