@@ -239,7 +239,17 @@ module OpenShift
         if (defined? download_artifacts) && instance && (instance_status(instance) == :running) && options.download_artifacts?
           download_artifacts(instance.dns_name)
         end
-        terminate_instance(instance, true) if instance
+        
+        while true
+          print "Terminate instance #{instance.id} (#{instance.tags["Name"]}) ? (yes|no): "
+	  terminate_option = $stdin.gets
+          if terminate_option.match(/\A(y|yes)\Z/i)
+	    terminate_instance(instance, true) if instance
+            break
+          elsif terminate_option.match(/\A(n|no)\Z/i)
+            break
+	  end
+	end
       end
     end
 
