@@ -3,6 +3,7 @@ require 'pp'
 require 'aws'
 require 'aws-sdk'
 require 'date'
+require 'pry'
 
 module OpenShift
   module Amazon
@@ -89,7 +90,7 @@ module OpenShift
         filter_param = "image-id"
       else
         filter_param = "name"
-      end 
+      end
       AWS.memoize do
         devenv_amis = conn.images.
           filter("state", "available").
@@ -104,7 +105,7 @@ module OpenShift
         filter_param = "image-id"
       else
         filter_param = "name"
-      end 
+      end
       AWS.memoize do
         devenv_amis = conn.images.with_owner(:self).
           filter("state", "available").
@@ -150,7 +151,7 @@ module OpenShift
       end
       instances.each do |i|
         if (instance_status(i) != :terminated)
-          puts "Found instance #{i.id} (#{i.tags["Name"]})" unless silent
+          puts "Found instance will be terminated: #{i.id} (#{i.tags["Name"]})" unless silent
           block_until_available(i, ssh_user) if block_until_available
           return i
         end
@@ -163,16 +164,34 @@ module OpenShift
       matches = 0
       if use_tag
         instances = conn.instances.filter('tag-key', 'Name').filter('tag-value', "#{name}*")
-        instances.each do |i|
-          if (instance_status(i) != :terminated)
-            puts "Did you mean one of the following?" if matches == 0
-            puts "  #{i.tags["Name"]}"
-            matches = matches + 1
+        if instances.any?
+          instances.each do |i|
+            if (instance_status(i) != :terminated)
+              puts "Did you mean one of the following?" if matches == 0
+              puts "  #{i.tags["Name"]} - #{i.id}"
+              matches = matches + 1
+            end
           end
         end
       end
 
       return nil
+    end
+
+    def find_same_name_instances(conn, name, use_tag=false, silent=false)
+      if use_tag
+        instances = conn.instances.filter('tag-key', 'Name').filter('tag-value', name)
+      else
+        instances = conn.instances.filter('dns-name', name)
+      end
+      if instances.any?
+        puts "Found instances with same name:"
+        instances.each do |i|
+          if (instance_status(i) != :terminated)
+            puts "  #{i.tags["Name"]} - #{i.id}" unless silent
+          end
+        end
+      end
     end
 
     def terminate_instance(instance, handle_unauthorized=false)
@@ -358,7 +377,7 @@ module OpenShift
       outer_num_retries = 4
       image = nil
       (1..outer_num_retries).each do |outer_index|
-        image = conn.images.create(:instance_id => instance.id, 
+        image = conn.images.create(:instance_id => instance.id,
           :name => name,
           :description => manifest)
         num_retries = 10

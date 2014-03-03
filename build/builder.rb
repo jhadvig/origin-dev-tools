@@ -236,7 +236,7 @@ module OpenShift
 
     desc "terminate TAG", "Terminates the instance with the specified tag"
     method_option :base_os, :default => nil, :desc => "Operating system for Origin (fedora or rhel)"
-    method_option :download_artifacts, :type => :boolean, :desc => "Download artifacts before terminating"    
+    method_option :download_artifacts, :type => :boolean, :desc => "Download artifacts before terminating"
     method_option :verbose, :type => :boolean, :desc => "Enable verbose logging"
     method_option :region, :required => false, :desc => "Amazon region override (default us-east-1)"
     method_option :ssh_user, :type => :string, :default => "root", :desc => "User to use when ssh'ing to build machine"
@@ -248,7 +248,10 @@ module OpenShift
       if (defined? download_artifacts) && instance && (instance_status(instance) == :running) && options.download_artifacts?
         download_artifacts(instance.dns_name)
       end
-      terminate_instance(instance, true) if instance
+      if instance
+        terminate_instance(instance, true)
+        find_same_name_instances(conn, tag, true, false)
+      end
     end
 
     desc "update_ssh_config TAG", "Updates the verifier entry in the ssh config file with the dns info from tag"
